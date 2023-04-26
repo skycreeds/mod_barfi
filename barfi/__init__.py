@@ -6,7 +6,7 @@ from .block_builder import Block
 from .compute_engine import ComputeEngine
 from .manage_schema import load_schema_name, load_schemas, save_schema
 from .manage_schema import editor_preset
-
+import hashlib
 import os
 
 _RELEASE = False
@@ -22,16 +22,11 @@ _RELEASE = False
 # your component frontend. Everything else we do in this file is simply a
 # best practice.
 
-if not _RELEASE:
-    _component_func = components.declare_component(
-        "st_barfi",
-        url="http://localhost:3001",
-    )
-else:
-    parent_dir = os.path.dirname(os.path.abspath(__file__))
-    build_dir = os.path.join(parent_dir, "client")
-    _component_func = components.declare_component(
-        "st_barfi", path=build_dir)
+
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+build_dir = os.path.join(parent_dir, "client")
+_component_func = components.declare_component(
+    "st_barfi", path=build_dir)
 
 # Create a wrapper function for the component. This is an optional
 # best practice - we could simply expose the component function returned by
@@ -46,14 +41,14 @@ else:
 # "name" argument without having it get recreated.
 
 
-def st_barfi(base_blocks: Union[List[Block], Dict], load_schema: str = None, compute_engine: bool = True, key=None):
+def st_barfi(base_blocks: Union[List[Block], Dict], load_schema: str = None, compute_engine: bool = True, key=None,user=None):
     if load_schema:
-        editor_schema = load_schema_name(load_schema)
+        editor_schema = load_schema_name(load_schema+'@'+hashlib.sha256(user.encode()).hexdigest(),user)
     else:
         editor_schema = None
 
-    schemas_in_db = load_schemas()
-    schema_names_in_db = schemas_in_db['schema_names']
+    schemas_in_db = load_schemas(user)
+    schema_names_in_db = [x.split('@')[0] for x in schemas_in_db['schema_names']]
 
     editor_setting = {'compute_engine': compute_engine}
 
@@ -98,18 +93,16 @@ def st_barfi(base_blocks: Union[List[Block], Dict], load_schema: str = None, com
             return _from_client
     if _from_client['command'] == 'save':
         save_schema(
-            schema_name=_from_client['schema_name'], schema_data=_from_client['editor_state'])
+            schema_name=_from_client['schema_name'], schema_data=_from_client['editor_state'],user=user)
     if _from_client['command'] == 'load':
         load_schema = _from_client['schema_name']
-        editor_schema = load_schema_name(load_schema)
+        editor_schema = load_schema_name(load_schema,user)
     else:
         pass
 
     return {}
 
 
-def barfi_schemas():
-    schemas_in_db = load_schemas()
-    schema_names_in_db = schemas_in_db['schema_names']
-
-    return schema_names_in_db
+def barfi_schemas(user:str):
+    schemas_in_db = load_schemas(user)
+    return [str(x).split('@')[0] for x in schemas_in_db['schema_names']]
